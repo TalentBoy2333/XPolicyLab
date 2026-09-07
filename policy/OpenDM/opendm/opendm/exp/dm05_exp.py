@@ -53,6 +53,28 @@ class Config:
     pass
 
 
+def _resolve_output_action_mask(
+    output_action_dim: int,
+    configured_mask: list[bool] | tuple[bool, ...] | np.ndarray | None,
+) -> np.ndarray:
+    """Separate the returned model width from its active robot dimensions."""
+
+    output_action_dim = int(output_action_dim)
+    if output_action_dim <= 0:
+        raise ValueError(
+            f"output_action_dim must be positive, got {output_action_dim}"
+        )
+    if configured_mask is None:
+        return np.ones(output_action_dim, dtype=bool)
+    mask = np.asarray(configured_mask, dtype=bool)
+    if mask.ndim != 1 or mask.shape[0] != output_action_dim:
+        raise ValueError(
+            "output_action_mask must be a 1D vector with "
+            f"output_action_dim={output_action_dim} entries, got {mask.shape}"
+        )
+    return mask
+
+
 @dataclass
 class DM05ModelConfig(Config):
     model_name_or_path: str | None = field(default="./checkpoints/DM05")
@@ -407,12 +429,14 @@ class DM05InferenceConfig(Config):
     port: int = field(default=7891)
     enable_bf16_compute: bool = field(default=False)
     norm_clip_to_bounds: bool = field(default=False)
+    prompt_format: Literal["refined", "reference"] = field(default="refined")
     diffusion_steps: int = field(default=10)
     diffusion_integration_dtype: Literal["model", "float32"] = field(
         default="model"
     )
     diffusion_noise_seed: int | None = field(default=None)
     output_action_dim: int = field(default=14)
+    output_action_mask: list[bool] | None = field(default=None)
     image_keys: list[str] = field(
         default_factory=lambda: ["images_1", "images_2", "images_3"]
     )
@@ -465,6 +489,7 @@ class DM05InferenceConfig(Config):
                     image_keys=self.image_keys,
                     add_state=add_state,
                     is_history=is_history,
+                    prompt_format=self.prompt_format,
                     enable_logging=True,
                 ),
                 ToDevice(device=self.device),
@@ -526,6 +551,15 @@ class DM05InferenceConfig(Config):
         model_input = self.input_transform(data)
         dm05_model = unwrap_dm05_model(self.model)
         action_dim = dm05_model.model.config.action_dim
+        if self.output_action_dim > action_dim:
+            raise ValueError(
+                f"output_action_dim={self.output_action_dim} exceeds model "
+                f"action_dim={action_dim}"
+            )
+        output_action_mask = _resolve_output_action_mask(
+            self.output_action_dim,
+            self.output_action_mask,
+        )
         action_mask = torch.zeros(
             1,
             1,
@@ -533,7 +567,11 @@ class DM05InferenceConfig(Config):
             device=self.device,
             dtype=dm05_model.model.action_in_proj.weight.dtype,
         )
-        action_mask[..., : self.output_action_dim] = 1.0
+        action_mask[..., : self.output_action_dim] = torch.as_tensor(
+            output_action_mask,
+            device=self.device,
+            dtype=action_mask.dtype,
+        )
         with torch.autocast(
             device_type=self.device.type,
             dtype=torch.bfloat16,

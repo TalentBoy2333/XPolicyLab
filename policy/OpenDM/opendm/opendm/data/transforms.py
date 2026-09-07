@@ -52,6 +52,17 @@ def _refine_and_wrap_task_prompt(prompt: object) -> str:
     return text
 
 
+def _format_task_prompt(prompt: object, prompt_format: str) -> str:
+    if prompt_format == "reference":
+        return f"Task: {prompt}."
+    if prompt_format == "refined":
+        return _refine_and_wrap_task_prompt(prompt)
+    raise ValueError(
+        "prompt_format must be 'refined' or 'reference', got "
+        f"{prompt_format!r}"
+    )
+
+
 def _select_state_for_text(state: object, meta: dict) -> np.ndarray:
     """Drop 0426 shared-layout padding before serializing state bins."""
     state_arr = np.asarray(state, dtype=np.float32)
@@ -528,6 +539,7 @@ class ChatTokenization:
         image_keys: list[str] | None = None,
         add_state: bool = True,
         is_history: bool = False,
+        prompt_format: str = "refined",
         enable_logging: bool = False,
     ):
         self.processor = processor
@@ -539,6 +551,8 @@ class ChatTokenization:
         self.image_keys = image_keys
         self.add_state = add_state
         self.is_history = is_history
+        self.prompt_format = str(prompt_format).strip().lower()
+        _format_task_prompt("", self.prompt_format)
         self.enable_logging = enable_logging
         self.history_placeholder_token_id = self.tokenizer.convert_tokens_to_ids(
             "<unused0>"
@@ -588,7 +602,7 @@ class ChatTokenization:
             f"Expected speed to be a string, got {type(speed)}"
         )
         text_parts.append(f"Overall speed: {speed}\n")
-        prompt_text = _refine_and_wrap_task_prompt(data["prompt"])
+        prompt_text = _format_task_prompt(data["prompt"], self.prompt_format)
         text_parts.append(f"{prompt_text}\n")
         user_content = [{"type": "text", "text": "".join(text_parts)}]
 
