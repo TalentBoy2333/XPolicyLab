@@ -6,6 +6,7 @@ from types import SimpleNamespace
 
 import numpy as np
 import pytest
+import yaml
 
 from XPolicyLab.policy.OpenDM import model as opendm_model
 from XPolicyLab.policy.OpenDM.robot_profiles import (
@@ -59,6 +60,59 @@ def test_model_selects_robot_metadata_without_changing_mm_runtime(
     assert model.history_slots == 20
     assert model.history_action_interval == 25
     assert model.supports_compact_infer is False
+
+
+def test_default_and_single_frame_deploy_profiles_are_isolated():
+    policy_dir = Path(__file__).resolve().parents[1] / "policy" / "OpenDM"
+    default = yaml.safe_load((policy_dir / "deploy.yml").read_text())
+    single_frame = yaml.safe_load(
+        (policy_dir / "deploy_single_frame.yml").read_text()
+    )
+    piper_bf16 = yaml.safe_load(
+        (policy_dir / "deploy_real_piper_single_frame_bf16.yml").read_text()
+    )
+
+    assert default["experiment_path"] == "scripts/robodojo_dm05_history.py"
+    assert default["model_action_mode"] == "absolute"
+    assert default["history_enabled"] is True
+    assert default["action_steps"] == 25
+
+    assert single_frame["experiment_path"] == "scripts/robodojo_dm05.py"
+    assert single_frame["model_action_mode"] == "relative"
+    assert single_frame["history_enabled"] is False
+    assert single_frame["action_chunk_size"] == 50
+    assert single_frame["action_steps"] == 25
+    assert single_frame["model_max_length"] == 1024
+    assert single_frame["precision_mode"] == "mixed"
+    assert single_frame["bf16"] is False
+    assert single_frame["enable_bf16_compute"] is True
+    assert single_frame["force_fp32_action_path"] is True
+
+    checkpoint = (
+        "/mlp_vepfs/share/zrt/projects/dev/opendm/user_checkpoints/"
+        "dm05_robodojo_real_piper/checkpoint-80000"
+    )
+    assert piper_bf16["model_path"] == checkpoint
+    assert piper_bf16["norm_stats_path"] == f"{checkpoint}/norm_stats.json"
+    assert piper_bf16["env_cfg_type"] == "piper"
+    assert piper_bf16["experiment_path"] == "scripts/robodojo_dm05.py"
+    assert piper_bf16["model_action_mode"] == "relative"
+    assert piper_bf16["history_enabled"] is False
+    assert piper_bf16["model_action_dim"] == 14
+    assert piper_bf16["model_state_dim"] == 14
+    assert piper_bf16["action_chunk_size"] == 50
+    assert piper_bf16["action_steps"] == 25
+    assert piper_bf16["diffusion_noise_seed"] == 0
+    assert piper_bf16["prompt_format"] == "reference"
+    assert piper_bf16["norm_clip_to_bounds"] is True
+    assert piper_bf16["precision_mode"] == "bf16"
+    assert piper_bf16["bf16"] is True
+    assert piper_bf16["enable_bf16_compute"] is False
+    assert piper_bf16["force_fp32_action_path"] is False
+    assert piper_bf16["diffusion_integration_dtype"] == "model"
+
+    assert single_frame["model_action_dim"] is None
+    assert single_frame["model_state_dim"] is None
 
 
 def test_legacy_precision_knobs_keep_the_existing_mixed_path():
@@ -434,6 +488,20 @@ def test_model_rejects_unknown_action_mode_before_loading_assets():
                 "model_action_mode": "velocity",
             }
         )
+
+
+def test_launcher_exposes_single_frame_overrides():
+    launcher = (
+        Path(__file__).resolve().parents[1]
+        / "policy"
+        / "OpenDM"
+        / "setup_eval_policy_server.sh"
+    ).read_text()
+
+    assert 'OPENDM_ACTION_MODE:-' in launcher
+    assert 'OVERRIDES+=(model_action_mode="${OPENDM_ACTION_MODE}")' in launcher
+    assert 'OPENDM_PRECISION_MODE:-' in launcher
+    assert 'OVERRIDES+=(precision_mode="${OPENDM_PRECISION_MODE}")' in launcher
 
 
 def test_model_enables_compact_infer_only_for_single_frame(monkeypatch, tmp_path):

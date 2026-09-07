@@ -1,0 +1,52 @@
+policy_name: OpenDM
+protocol: ws
+host: localhost
+port: null
+
+bench_name: null
+task_name: null
+ckpt_name: null
+env_cfg_type: null
+seed: null
+action_type: joint
+gpu_id: null
+eval_batch: false
+
+# Single-frame/non-memory RoboDojo DM0.5 contract. This profile decodes the
+# relative arm actions used by the checkpoint and converts them to absolute
+# joint targets before returning them. Gripper targets remain absolute.
+model_path: null
+norm_stats_path: null
+# Auto-detected from norm_stats.json. Current dexbotic-open single-frame
+# checkpoints use 22-D model action/state statistics; wire actions remain 14-D.
+model_action_dim: null
+model_state_dim: null
+experiment_path: scripts/robodojo_dm05.py
+model_action_mode: relative
+action_chunk_size: 50
+# Generate the checkpoint's complete 50-step horizon, but return the first
+# 25 control steps before the client replans.
+action_steps: 25
+history_enabled: false
+
+diffusion_steps: 10
+diffusion_integration_dtype: model
+diffusion_noise_seed: null
+prompt: null
+robot_type: null
+control_mode: null
+speed: "0.5"
+add_state: true
+n_bins: 256
+model_max_length: 1024
+
+# Match the training-compatible non-memory inference path: keep model weights
+# in FP32, use BF16 autocast for compute, and force the action expert to FP32.
+precision_mode: mixed
+bf16: false
+enable_bf16_compute: true
+force_fp32_action_path: true
+llm_attn_implementation: eager
+vision_attn_implementation: sdpa
+action_attn_implementation: sdpa
+liger_kernel: true

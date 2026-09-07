@@ -1,0 +1,54 @@
+policy_name: OpenDM
+protocol: ws
+host: localhost
+port: null
+
+bench_name: RoboDojo
+task_name: null
+ckpt_name: checkpoint-80000
+env_cfg_type: piper
+seed: 0
+action_type: joint
+gpu_id: null
+eval_batch: false
+
+# checkpoint-80000 is a single-frame Piper model trained with relative arm
+# actions and absolute grippers. Its checkpoint-local norm_stats.json declares
+# a native 14-D state/action layout; the network itself pads actions to 32-D.
+model_path: /mlp_vepfs/share/zrt/projects/dev/opendm/user_checkpoints/dm05_robodojo_real_piper/checkpoint-80000
+norm_stats_path: /mlp_vepfs/share/zrt/projects/dev/opendm/user_checkpoints/dm05_robodojo_real_piper/checkpoint-80000/norm_stats.json
+model_action_dim: 14
+model_state_dim: 14
+experiment_path: scripts/robodojo_dm05.py
+model_action_mode: relative
+action_chunk_size: 50
+action_steps: 25
+history_enabled: false
+
+diffusion_steps: 10
+# Pin the initial action noise for repeatable parity checks. Change or clear
+# this seed for stochastic evaluation after the implementations are aligned.
+diffusion_noise_seed: 0
+prompt: null
+prompt_format: reference
+# Match the reference server's quantile normalization for arbitrary mock states.
+norm_clip_to_bounds: true
+robot_type: null
+control_mode: null
+speed: "0.5"
+add_state: true
+n_bins: 256
+model_max_length: 1024
+
+# Reference single-frame path: cast the complete model to BF16, keep diffusion
+# state in model dtype, and do not layer autocast or a forced FP32 action path
+# on top. The existing unnamed/mixed deployment path remains available.
+precision_mode: bf16
+bf16: true
+enable_bf16_compute: false
+force_fp32_action_path: false
+diffusion_integration_dtype: model
+llm_attn_implementation: eager
+vision_attn_implementation: sdpa
+action_attn_implementation: sdpa
+liger_kernel: true

@@ -45,10 +45,11 @@ OVERRIDES=(
 
 [[ -z "${MODEL_PATH:-}" ]] || OVERRIDES+=(model_path="${MODEL_PATH}")
 [[ -z "${NORM_STATS_PATH:-}" ]] || OVERRIDES+=(norm_stats_path="${NORM_STATS_PATH}")
+[[ -z "${OPENDM_ACTION_MODE:-}" ]] || OVERRIDES+=(model_action_mode="${OPENDM_ACTION_MODE}")
 [[ -z "${OPENDM_ACTION_STEPS:-}" ]] || OVERRIDES+=(action_steps="${OPENDM_ACTION_STEPS}")
+[[ -z "${OPENDM_PRECISION_MODE:-}" ]] || OVERRIDES+=(precision_mode="${OPENDM_PRECISION_MODE}")
 [[ -z "${OPENDM_DIFFUSION_STEPS:-}" ]] || OVERRIDES+=(diffusion_steps="${OPENDM_DIFFUSION_STEPS}")
 [[ -z "${OPENDM_DIFFUSION_NOISE_SEED:-}" ]] || OVERRIDES+=(diffusion_noise_seed="${OPENDM_DIFFUSION_NOISE_SEED}")
-
 echo "[SERVER] policy=OpenDM task=${task_name} port=${policy_server_port} config=${yaml_file}"
 exec env \
     PYTHONWARNINGS=ignore::UserWarning \
